@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Large source assets not needed to run the site
+# (the site renders from frames/ — keep these out of git to stay lean).
+# Delete these lines if you want the source video + reference images in the repo.
+*.mp4
+Image References/

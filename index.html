@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Evergrid AI — The Inference Neocloud</title>
+<meta name="description" content="High-performance, single tenant AI clusters. Evergrid builds AI infrastructure to power the 4th Industrial Revolution." />
+<style>
+  @font-face{font-family:'Switzer';src:url('fonts/Switzer-Variable.ttf') format('truetype-variations');font-weight:100 900;font-display:swap}
+  @font-face{font-family:'Switzer';src:url('fonts/Switzer-Bold.ttf') format('truetype');font-weight:700;font-display:swap}
+  @font-face{font-family:'Boing';src:url('fonts/Boing-Semibold.ttf') format('truetype');font-weight:600;font-display:swap}
+  @font-face{font-family:'Boing';src:url('fonts/Boing-Medium.ttf') format('truetype');font-weight:500;font-display:swap}
+
+  :root{
+    --orange:#FF9140; --orange-deep:#F0791F; --ink:#2B2926; --muted:#B7B3A9;
+    --glass:rgba(10,9,8,.58); --hairline:rgba(255,255,255,.14);
+    --vh:1vh;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{overscroll-behavior:none;-webkit-text-size-adjust:100%}
+  html.lenis,html.lenis body{height:auto}
+  .lenis.lenis-smooth{scroll-behavior:auto!important}
+  body{font-family:'Switzer',ui-sans-serif,system-ui,sans-serif;background:#000;color:#fff;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  ::selection{background:var(--orange);color:#000}
+
+  #stage{position:fixed;inset:0;height:100vh;height:100dvh;width:100vw;z-index:0;background:#000;overflow:hidden}
+  #frameCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(130% 95% at 50% 42%, transparent 46%, rgba(0,0,0,.5) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,.42) 0%, transparent 20%, transparent 62%, rgba(0,0,0,.6) 100%);}
+  #grain{position:fixed;inset:-100%;z-index:2;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain 7s steps(10) infinite}
+  @keyframes grain{0%,100%{transform:translate(0,0)}10%{transform:translate(-4%,-6%)}30%{transform:translate(4%,3%)}50%{transform:translate(-5%,5%)}70%{transform:translate(6%,-3%)}90%{transform:translate(-3%,6%)}}
+
+  #loader{position:fixed;inset:0;z-index:50;background:#0b0a09;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .6s ease}
+  #loader.hidden{opacity:0;pointer-events:none}
+  .load-mark{font-family:'Boing','Switzer',sans-serif;font-weight:600;font-size:22px;letter-spacing:.02em}
+  .load-mark b{color:var(--orange)}
+  .bar{width:210px;height:2px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
+  .bar span{display:block;height:100%;width:0%;background:var(--orange);transition:width .15s linear}
+  .load-sub{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+
+  #progressTop{position:fixed;top:0;left:0;height:2px;width:0%;background:var(--orange);z-index:40}
+  #readout{position:fixed;bottom:22px;right:clamp(18px,3vw,42px);z-index:25;text-align:right;
+    font-size:11px;letter-spacing:.18em;color:rgba(255,255,255,.55);text-transform:uppercase;font-variant-numeric:tabular-nums;line-height:1.8;pointer-events:none}
+  #readout b{color:var(--orange);font-weight:600}
+
+  header{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+    padding:20px clamp(18px,5vw,64px);padding-top:max(20px,env(safe-area-inset-top));transition:background .4s ease, backdrop-filter .4s ease}
+  header.solid{background:rgba(10,9,8,.5);backdrop-filter:blur(10px)}
+  .wordmark{font-family:'Boing','Switzer',sans-serif;font-weight:600;font-size:20px;letter-spacing:.01em;color:#fff;text-decoration:none}
+  .wordmark b{color:var(--orange)}
+  nav{display:flex;align-items:center;gap:34px}
+  nav a{color:rgba(255,255,255,.82);text-decoration:none;font-size:14.5px;font-weight:500;transition:color .2s}
+  nav a:hover{color:#fff}
+  .btn{display:inline-block;background:var(--orange);color:var(--ink);font-weight:600;font-size:14px;padding:11px 20px;border-radius:999px;text-decoration:none;transition:transform .18s ease, background .2s ease;white-space:nowrap;cursor:pointer;border:none}
+  .btn:hover{background:var(--orange-deep);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35)}
+  .btn.ghost:hover{border-color:#fff;background:rgba(255,255,255,.08)}
+  @media(max-width:820px){nav .navlink{display:none}}
+
+  #sizer{position:relative;z-index:1;width:1px}
+
+  .beat{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:center;
+    padding:0 clamp(20px,6vw,110px);opacity:0;visibility:hidden;pointer-events:none;will-change:opacity,transform}
+  .beat.centered{align-items:center}
+  .beat.centered .content{text-align:center}
+
+  .content{max-width:600px;position:relative;padding:clamp(22px,3vw,42px);background:var(--glass);
+    backdrop-filter:blur(16px) saturate(1.15);border:1px solid var(--hairline);border-radius:2px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+  .content.wide{max-width:820px}
+  .content::before,.content::after{content:"";position:absolute;width:18px;height:18px;pointer-events:none}
+  .content::before{top:-1px;left:-1px;border-top:2px solid var(--orange);border-left:2px solid var(--orange)}
+  .content::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--orange);border-right:2px solid var(--orange)}
+
+  .kicker{display:flex;align-items:center;gap:12px;margin-bottom:16px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--orange);font-weight:600}
+  .kicker::before{content:"";width:30px;height:1px;background:var(--orange);opacity:.8}
+  .beat.centered .kicker{justify-content:center}
+  .idx{color:rgba(255,255,255,.4);font-variant-numeric:tabular-nums}
+
+  h1{font-family:'Switzer',sans-serif;font-weight:700;font-size:clamp(38px,6.4vw,80px);line-height:1.02;letter-spacing:-.02em;text-shadow:0 2px 30px rgba(0,0,0,.6)}
+  h1 .accent{color:var(--orange)}
+  h2{font-family:'Switzer',sans-serif;font-weight:700;font-size:clamp(25px,3.5vw,44px);line-height:1.08;letter-spacing:-.015em;text-shadow:0 2px 24px rgba(0,0,0,.55)}
+  .sub{font-size:clamp(15px,1.9vw,21px);color:rgba(255,255,255,.88);margin-top:16px;line-height:1.5}
+  .lead{font-size:clamp(14px,1.55vw,18px);color:rgba(255,255,255,.8);margin-top:15px;line-height:1.6}
+  .cta-row{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
+  .beat.centered .cta-row{justify-content:center}
+
+  .ledger{margin-top:24px;border-top:1px solid var(--hairline)}
+  .row{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:15px 0;border-bottom:1px solid var(--hairline);transition:background .25s ease;align-items:baseline}
+  .row:hover{background:rgba(255,145,64,.05)}
+  .row .n{font-variant-numeric:tabular-nums;color:var(--orange);font-weight:600;font-size:13px;letter-spacing:.12em}
+  .row h3{font-size:18px;font-weight:600;margin-bottom:4px}
+  .row .rs{font-size:11px;color:var(--orange);letter-spacing:.13em;text-transform:uppercase;font-weight:600;opacity:.85;margin-bottom:6px}
+  .row p{font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.75)}
+
+  .stats{display:flex;gap:clamp(20px,4vw,60px);margin-top:26px;flex-wrap:wrap}
+  .beat.centered .stats{justify-content:center}
+  .stat .big{font-family:'Switzer',sans-serif;font-weight:700;font-size:clamp(32px,4.6vw,60px);line-height:1;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.5)}
+  .stat .big em{font-style:normal;color:var(--orange)}
+  .stat .lbl{font-size:11px;color:rgba(255,255,255,.65);margin-top:9px;letter-spacing:.14em;text-transform:uppercase}
+  .foot-line{margin-top:34px;color:rgba(255,255,255,.4);font-size:12.5px;letter-spacing:.05em}
+
+  #calloutSvg{position:fixed;inset:0;width:100vw;height:100vh;z-index:15;pointer-events:none}
+  #calloutSvg line{stroke:var(--orange);stroke-width:1.25}
+  #calloutSvg circle.core{fill:var(--orange)}
+  #calloutSvg circle.ring{fill:none;stroke:var(--orange);stroke-width:1}
+  .chip{position:fixed;z-index:16;pointer-events:none;opacity:0;transform:translateY(6px);max-width:230px;
+    background:rgba(10,9,8,.72);backdrop-filter:blur(12px);border:1px solid rgba(255,145,64,.5);
+    padding:10px 14px;border-radius:2px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .chip b{color:var(--orange)}
+  .chip small{display:block;margin-top:3px;color:rgba(255,255,255,.6);font-weight:500;letter-spacing:.08em;font-size:10.5px;text-transform:none}
+
+  .rail{position:fixed;left:clamp(14px,3vw,38px);top:50%;transform:translateY(-50%);z-index:25;display:flex;flex-direction:column;align-items:center}
+  .tick{width:2px;height:30px;background:rgba(255,255,255,.18);position:relative;overflow:hidden}
+  .tick i{position:absolute;inset:0;background:var(--orange);transform:scaleY(0);transform-origin:top}
+  .tick.dot{height:0;margin:9px 0}
+  .tick.dot::after{content:"";position:absolute;left:-2px;top:-3px;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25)}
+
+  .scrollhint{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:20;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;gap:8px;transition:opacity .5s ease}
+  .scrollhint .m{width:1px;height:34px;background:linear-gradient(to bottom,var(--orange),transparent);animation:drop 1.8s ease-in-out infinite}
+  @keyframes drop{0%{opacity:0;transform:scaleY(.2)}50%{opacity:1}100%{opacity:0;transform:translateY(20px) scaleY(.2)}}
+
+  /* ---------- mobile ---------- */
+  @media(max-width:900px){
+    .chip{display:none} #calloutSvg{display:none} #readout{display:none} .rail{display:none}
+    .beat{padding:0 20px;justify-content:flex-end;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+    .beat.centered{justify-content:center;padding-bottom:0}
+    .content,.content.wide{max-width:100%;width:100%;padding:22px 20px}
+    #stage::after{background:
+      radial-gradient(140% 90% at 50% 30%, transparent 30%, rgba(0,0,0,.5) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,.5) 0%, transparent 30%, rgba(0,0,0,.35) 55%, rgba(0,0,0,.82) 100%);}
+    h1{font-size:clamp(38px,12vw,60px)}
+    h2{font-size:clamp(24px,6.6vw,38px)}
+    .row p{font-size:13.5px}
+    .stats{gap:20px}
+    .scrollhint{bottom:calc(14px + env(safe-area-inset-bottom))}
+  }
+  @media(max-width:900px) and (min-height:1px){
+    /* keep tall content readable: let the glass card cap its height and scroll internally if needed */
+    .content{max-height:72vh;max-height:72dvh;overflow:auto}
+  }
+</style>
+</head>
+<body>
+
+  <div id="loader">
+    <div class="load-mark">EVERGRID <b>AI</b></div>
+    <div class="bar"><span id="barFill"></span></div>
+    <div class="load-sub" id="loadPct">Loading experience</div>
+  </div>
+
+  <div id="stage"><canvas id="frameCanvas"></canvas></div>
+  <div id="grain"></div>
+  <div id="progressTop"></div>
+  <svg id="calloutSvg"></svg>
+
+  <header id="header">
+    <a href="#top" class="wordmark">EVERGRID <b>AI</b></a>
+    <nav>
+      <a href="#s3" class="navlink">Services</a>
+      <a href="#s5" class="navlink">Contact</a>
+      <a href="#s5" class="btn">Talk to an Engineer</a>
+    </nav>
+  </header>
+
+  <div class="rail" id="rail"></div>
+  <div id="readout"><span id="sector">SECTOR 01 — AISLE</span><br><b id="fcount">F 0001 / 0900</b></div>
+  <div class="scrollhint" id="hint"><span>Scroll</span><span class="m"></span></div>
+
+  <a id="top"></a>
+  <div id="beats">
+    <!-- 01 · aisle -->
+    <section class="beat" data-sector="SECTOR 01 — AISLE">
+      <div class="content">
+        <div class="kicker"><span class="idx">01</span> Evergrid AI</div>
+        <h1>The <span class="accent">Inference</span><br>Neocloud</h1>
+        <p class="sub">High-performance, single-tenant AI clusters — built for the workloads that define the next era.</p>
+        <div class="cta-row"><a href="#s5" class="btn">Speak to an Engineer</a></div>
+      </div>
+    </section>
+
+    <!-- 02 · AMD GPUs inside the orange rack -->
+    <section class="beat" data-sector="SECTOR 02 — AMD · GPU">
+      <div class="content">
+        <div class="kicker"><span class="idx">02</span> Backed by AMD</div>
+        <h2>Frontier compute, powered by AMD Instinct.</h2>
+        <p class="lead">We design, deploy, and operate large-scale AI infrastructure on AMD Instinct accelerators and emerging hardware — for labs, hyperscalers, enterprises, and institutions.</p>
+      </div>
+    </section>
+
+    <!-- 03 · board / services -->
+    <section class="beat" id="s3" data-sector="SECTOR 03 — BOARD">
+      <div class="content wide">
+        <div class="kicker"><span class="idx">03</span> Our Services</div>
+        <h2>Full-stack, from silicon to endpoint.</h2>
+        <div class="ledger">
+          <div class="row"><span class="n">01</span><div><div class="rs">Managed AI</div><p>Dedicated inference endpoints with hardware-specific optimization, multi-model routing, and enterprise-ready agent environments — GPU or token-based pricing.</p></div></div>
+          <div class="row"><span class="n">02</span><div><div class="rs">Compute Platform</div><p>Training, inference, and HPC on managed Slurm, Kubernetes, and VMs — high-performance CPU, low-latency networking, scalable persistent storage.</p></div></div>
+          <div class="row"><span class="n">03</span><div><div class="rs">Fleet &amp; Infrastructure</div><p>Capacity at scale: automated provisioning, health checks, and healing. Gigascale AI factories with advanced cooling and GPU-native redundancy.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 · chip / why -->
+    <section class="beat" data-sector="SECTOR 04 — SILICON">
+      <div class="content">
+        <div class="kicker"><span class="idx">04</span> Why Evergrid</div>
+        <h2>Frontier infrastructure for the next era of AI</h2>
+        <div class="stats">
+          <div class="stat"><div class="big">1<em>GW+</em></div><div class="lbl">Under development</div></div>
+          <div class="stat"><div class="big">12<em>min</em></div><div class="lbl">Response SLA · 24/7</div></div>
+          <div class="stat"><div class="big">100<em>%</em></div><div class="lbl">Single-tenant</div></div>
+        </div>
+        <p class="lead">Around-the-clock monitoring and a dedicated point of contact — on the latest emerging hardware, tuned with the manufacturers themselves.</p>
+      </div>
+    </section>
+
+    <!-- 05 · sparks / CTA -->
+    <section class="beat centered" id="s5" data-sector="SECTOR 05 — SIGNAL">
+      <div class="content">
+        <div class="kicker"><span class="idx">05</span> Get Started</div>
+        <h2>Power your next breakthrough on Evergrid.</h2>
+        <p class="lead">Tell us your workload, timeline, and scale. Our engineers will architect the cluster.</p>
+        <div class="cta-row"><a href="mailto:hello@evergrid.ai" class="btn">Talk to an Engineer</a><a href="#s3" class="btn ghost">Explore Services</a></div>
+        <div class="foot-line">© 2026 Evergrid AI · The Inference Neocloud</div>
+      </div>
+    </section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js"></script>
+<script>
+(function(){
+  const TOTAL_FRAMES = 900;
+  const PATH = i => 'frames/f_' + String(i).padStart(3,'0') + '.jpg';
+
+  /* section beats: the frame each section HOLDS on */
+  const SECTIONS = [
+    { frame: 1   },   // 01 aisle
+    { frame: 403 },   // 02 AMD Instinct modules — matches reference image 4
+    { frame: 500 },   // 03 board "city"
+    { frame: 680 },   // 04 chip die macro
+    { frame: 900 },   // 05 sparks
+  ];
+  const N = SECTIONS.length;
+  const HOLD = 0.60;
+  const SECTION_VH = 175;
+  const easeTravel = t => t<.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+  const smooth = t => t<=0?0 : t>=1?1 : t*t*(3-2*t);
+  const clamp01 = v => v<0?0:v>1?1:v;
+  const isMobile = () => window.matchMedia('(max-width:900px)').matches;
+
+  const canvas=document.getElementById('frameCanvas'), ctx=canvas.getContext('2d');
+  const loader=document.getElementById('loader'), barFill=document.getElementById('barFill'), loadPct=document.getElementById('loadPct');
+  const header=document.getElementById('header'), hint=document.getElementById('hint');
+  const progTop=document.getElementById('progressTop'), fcount=document.getElementById('fcount'), sectorEl=document.getElementById('sector');
+  const svg=document.getElementById('calloutSvg'), rail=document.getElementById('rail');
+  const beats=[...document.querySelectorAll('.beat')];
+  const sizer=document.createElement('div'); sizer.id='sizer'; document.body.appendChild(sizer);
+
+  const images=new Array(TOTAL_FRAMES+1);
+  let loaded=0, ready=false, dpr=Math.min(window.devicePixelRatio||1,2);
+  function setSizer(){ sizer.style.height=(N*SECTION_VH)+'vh'; }
+  setSizer();
+
+  /* dwell rail */
+  const railFills=[];
+  for(let i=0;i<N;i++){
+    const t=document.createElement('div'); t.className='tick';
+    const fill=document.createElement('i'); t.appendChild(fill); rail.appendChild(t); railFills.push(fill);
+    if(i<N-1){ const d=document.createElement('div'); d.className='tick dot'; rail.appendChild(d); }
+  }
+
+  /* callouts — anchored to specific on-screen features, chips live on the RIGHT */
+  const CALLOUTS = [
+    { section:1, anchor:[0.62,0.60], chip:[0.76,0.24], html:'<b>Backed by AMD</b><small>Instinct MI350-series accelerators</small>' },
+    { section:3, anchor:[0.52,0.45], chip:[0.72,0.24], html:'<b>Silicon-level tuning</b><small>Optimized with the manufacturers</small>' },
+  ];
+  const chipEls=CALLOUTS.map(c=>{ const d=document.createElement('div'); d.className='chip'; d.innerHTML=c.html;
+    d.style.left=(c.chip[0]*100)+'vw'; d.style.top=(c.chip[1]*100)+'vh'; document.body.appendChild(d); return d; });
+  const svgEls=CALLOUTS.map(()=>{ const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    const core=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    core.setAttribute('class','core'); ring.setAttribute('class','ring');
+    g.append(l,core,ring); g.setAttribute('opacity','0'); svg.appendChild(g); return {g,l,core,ring}; });
+
+  /* scroll → playhead (HOLD + TRAVEL) */
+  let lenis=null, scrollY=0;
+  if(window.Lenis){
+    lenis=new Lenis({lerp:0.08, wheelMultiplier:0.9, smoothWheel:true, syncTouch:true, touchMultiplier:1.4});
+    lenis.on('scroll', e=>{ scrollY=e.scroll; onScrollMeta(); });
+  } else {
+    window.addEventListener('scroll', ()=>{ scrollY=window.scrollY; onScrollMeta(); }, {passive:true});
+  }
+  function maxScroll(){ return document.documentElement.scrollHeight - window.innerHeight; }
+  function progress(){ const m=maxScroll(); return m>0?clamp01(scrollY/m):0; }
+  function onScrollMeta(){
+    if(scrollY>40){ header.classList.add('solid'); hint.style.opacity='0'; }
+    else { header.classList.remove('solid'); hint.style.opacity='1'; }
+    lastMoveT=performance.now(); snapArmed=true;
+  }
+
+  function mapScroll(p){
+    const seg=1/N;
+    let i=Math.min(N-1, Math.floor(p/seg));
+    let x=clamp01((p - i*seg)/seg);
+    let frame;
+    if(i>=N-1){ frame=SECTIONS[N-1].frame; }
+    else if(x<HOLD){ frame=SECTIONS[i].frame; }
+    else { const u=easeTravel((x-HOLD)/(1-HOLD)); frame=SECTIONS[i].frame + (SECTIONS[i+1].frame-SECTIONS[i].frame)*u; }
+    return {frame, sec:i, x};
+  }
+  const secOpacity=new Array(N).fill(0);
+  function computeSecOpacity(sec, x){
+    for(let k=0;k<N;k++) secOpacity[k]=0;
+    if(sec>=N-1){ secOpacity[N-1]=1; return; }
+    if(x<HOLD){ secOpacity[sec]=1; return; }
+    const u=clamp01((x-HOLD)/(1-HOLD));
+    secOpacity[sec]   = 1 - smooth(clamp01((u-0.10)/0.45));
+    secOpacity[sec+1] = smooth(clamp01((u-0.50)/0.45));
+  }
+
+  let playhead=1;
+  const STIFFNESS=6.0;
+
+  function dims(img){ return {w:img.width||img.naturalWidth, h:img.height||img.naturalHeight}; }
+  function drawBlend(idx){
+    const a=Math.max(1,Math.min(TOTAL_FRAMES,Math.floor(idx)));
+    const b=Math.max(1,Math.min(TOTAL_FRAMES,a+1));
+    const f=Math.min(1,Math.max(0,idx-a));
+    const imgA=images[a], imgB=images[b]; if(!imgA) return;
+    const d=dims(imgA); if(!d.w) return;
+    const cw=canvas.width, ch=canvas.height, ir=d.w/d.h, cr=cw/ch;
+    let dw,dh,dx,dy;
+    if(cr>ir){ dw=cw; dh=cw/ir; dx=0; dy=(ch-dh)/2; } else { dh=ch; dw=ch*ir; dy=0; dx=(cw-dw)/2; }
+    ctx.globalAlpha=1; ctx.drawImage(imgA,dx,dy,dw,dh);
+    if(f>0.02 && imgB){ ctx.globalAlpha=f; ctx.drawImage(imgB,dx,dy,dw,dh); ctx.globalAlpha=1; }
+  }
+  function resize(){ dpr=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=Math.round(window.innerWidth*dpr); canvas.height=Math.round(window.innerHeight*dpr); drawBlend(playhead); }
+
+  function applyText(){
+    for(let k=0;k<N;k++){
+      const o=secOpacity[k], e=smooth(o), b=beats[k];
+      b.style.opacity=e;
+      b.style.visibility = e<0.01 ? 'hidden':'visible';
+      b.style.transform='translateY('+((1-e)*20)+'px)';
+      b.style.pointerEvents = o>0.6 ? 'auto':'none';
+    }
+  }
+  function updateCallouts(now){
+    if(isMobile()) return;
+    for(let i=0;i<CALLOUTS.length;i++){
+      const c=CALLOUTS[i], act=smooth(secOpacity[c.section]);
+      const chip=chipEls[i], s=svgEls[i];
+      chip.style.opacity=act; chip.style.transform='translateY('+((1-act)*6)+'px)';
+      s.g.setAttribute('opacity',act);
+      if(act<=0.01) continue;
+      const vw=window.innerWidth, vh=window.innerHeight;
+      const ax=c.anchor[0]*vw, ay=c.anchor[1]*vh;
+      const r=chip.getBoundingClientRect();
+      const cx=r.left, cy=(r.top+r.bottom)/2;         // draw from chip's left edge toward the feature
+      const drawn=smooth(act);
+      s.l.setAttribute('x1',cx); s.l.setAttribute('y1',cy);
+      s.l.setAttribute('x2',cx+(ax-cx)*drawn); s.l.setAttribute('y2',cy+(ay-cy)*drawn);
+      s.core.setAttribute('cx',ax); s.core.setAttribute('cy',ay); s.core.setAttribute('r',3.2*act);
+      const pulse=(now/1000%1.6)/1.6;
+      s.ring.setAttribute('cx',ax); s.ring.setAttribute('cy',ay); s.ring.setAttribute('r',4+pulse*15);
+      s.ring.setAttribute('opacity',String((1-pulse)*0.7*act));
+    }
+  }
+  function updateRail(sec,x){
+    for(let i=0;i<N;i++){
+      let v=0; if(i<sec) v=1; else if(i>sec) v=0; else v = x<HOLD ? (x/HOLD) : 1;
+      railFills[i].style.transform='scaleY('+clamp01(v)+')';
+    }
+  }
+
+  let lastMoveT=0, snapArmed=false, snapping=false;
+  function sectionCenter(i){ const seg=1/N; const p=(i+(i>=N-1?0.5:HOLD*0.5))*seg; return p*maxScroll(); }
+  function maybeSnap(now){
+    if(!lenis||!snapArmed||snapping) return;
+    if(now-lastMoveT<220) return;
+    if(Math.abs(lenis.velocity||0)>0.16) return;
+    let best=-1, bestD=window.innerHeight*0.9;
+    for(let i=0;i<N;i++){ const d=Math.abs(sectionCenter(i)-scrollY); if(d<bestD){bestD=d;best=i;} }
+    snapArmed=false;
+    if(best>=0 && bestD>2){
+      snapping=true;
+      lenis.scrollTo(sectionCenter(best),{duration:1.4,
+        easing:t=>t<.5?8*t*t*t*t:1-Math.pow(-2*t+2,4)/2, lock:false, onComplete:()=>{snapping=false;}});
+      setTimeout(()=>{snapping=false;},1600);
+    }
+  }
+
+  let lastT=performance.now();
+  function tick(now){
+    const dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+    if(lenis) lenis.raf(now);
+    if(ready){
+      const p=progress(), m=mapScroll(p);
+      playhead += (m.frame - playhead) * (1 - Math.exp(-STIFFNESS*dt));
+      if(Math.abs(m.frame-playhead)<0.002) playhead=m.frame;
+      drawBlend(playhead);
+      computeSecOpacity(m.sec, m.x);
+      applyText(); updateCallouts(now); updateRail(m.sec,m.x);
+      progTop.style.width=(p*100)+'%';
+      fcount.textContent='F '+String(Math.round(playhead)).padStart(4,'0')+' / 0900';
+      sectorEl.textContent=beats[m.sec].getAttribute('data-sector');
+      maybeSnap(now);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function bump(){
+    loaded++; const pct=Math.round(loaded/TOTAL_FRAMES*100);
+    barFill.style.width=pct+'%'; loadPct.textContent='Loading experience '+pct+'%';
+    if(loaded>=TOTAL_FRAMES && !ready){ ready=true; resize();
+      scrollY=lenis?lenis.scroll:window.scrollY; const m=mapScroll(progress()); playhead=m.frame;
+      setTimeout(()=>loader.classList.add('hidden'),200); }
+  }
+  function loadFrame(i){
+    return fetch(PATH(i)).then(r=>r.blob()).then(b=>createImageBitmap(b))
+      .then(bmp=>{ images[i]=bmp; if(i===1){resize();drawBlend(1);} bump(); })
+      .catch(()=>{ const img=new Image(); img.onload=()=>{images[i]=img; if(i===1){resize();drawBlend(1);} bump();}; img.onerror=bump; img.src=PATH(i); });
+  }
+  function preload(){ const C=isMobile()?6:12; let next=1; function pump(){ if(next>TOTAL_FRAMES) return; const i=next++; loadFrame(i).then(pump);} for(let k=0;k<C;k++) pump(); }
+
+  let rt; window.addEventListener('resize', ()=>{ clearTimeout(rt); rt=setTimeout(()=>{ setSizer(); resize(); },120); }, {passive:true});
+  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ setSizer(); resize(); },300); });
+
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click',ev=>{ const id=a.getAttribute('href'); if(id.length<2) return;
+      const map={'#top':0,'#s3':2,'#s5':4}; if(id in map){ ev.preventDefault();
+        const y=sectionCenter(map[id]);
+        if(lenis) lenis.scrollTo(y,{duration:1.7,easing:x=>1-Math.pow(1-x,4)}); else window.scrollTo({top:y,behavior:'smooth'}); } });
+  });
+
+  resize(); preload(); requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
