@@ -167,7 +167,7 @@
   </header>
 
   <div class="rail" id="rail"></div>
-  <div id="readout"><span id="sector">SECTOR 01 — AISLE</span><br><b id="fcount">F 0001 / 0900</b></div>
+  <div id="readout"><span id="sector">SECTOR 01 — AISLE</span><br><b id="fcount">F 001 / 0300</b></div>
   <div class="scrollhint" id="hint"><span>Scroll</span><span class="m"></span></div>
 
   <a id="top"></a>
@@ -233,16 +233,16 @@
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js"></script>
 <script>
 (function(){
-  const TOTAL_FRAMES = 900;
-  const PATH = i => 'frames/f_' + String(i).padStart(3,'0') + '.jpg';
+  const TOTAL_FRAMES = 300;
+  const PATH = i => 'web/f_' + String(i).padStart(3,'0') + '.webp';
 
-  /* section beats: the frame each section HOLDS on */
+  /* section beats: the frame each section HOLDS on (300-frame web set) */
   const SECTIONS = [
     { frame: 1   },   // 01 aisle
-    { frame: 403 },   // 02 AMD Instinct modules — matches reference image 4
-    { frame: 500 },   // 03 board "city"
-    { frame: 680 },   // 04 chip die macro
-    { frame: 900 },   // 05 sparks
+    { frame: 134 },   // 02 AMD Instinct modules — matches reference image 4
+    { frame: 167 },   // 03 board "city"
+    { frame: 227 },   // 04 chip die macro
+    { frame: 300 },   // 05 sparks
   ];
   const N = SECTIONS.length;
   const HOLD = 0.60;
@@ -327,20 +327,30 @@
   const STIFFNESS=6.0;
 
   function dims(img){ return {w:img.width||img.naturalWidth, h:img.height||img.naturalHeight}; }
+  function isReady(img){ return !!(img && img.__loaded && (img.naturalWidth||img.width)); }
+  function nearestLoaded(idx){
+    if(isReady(images[idx])) return idx;
+    for(let r=1;r<TOTAL_FRAMES;r++){
+      if(idx-r>=1 && isReady(images[idx-r])) return idx-r;
+      if(idx+r<=TOTAL_FRAMES && isReady(images[idx+r])) return idx+r;
+    }
+    return -1;
+  }
   function drawBlend(idx){
     const a=Math.max(1,Math.min(TOTAL_FRAMES,Math.floor(idx)));
-    const b=Math.max(1,Math.min(TOTAL_FRAMES,a+1));
+    const b=Math.min(TOTAL_FRAMES,a+1);
     const f=Math.min(1,Math.max(0,idx-a));
-    const imgA=images[a], imgB=images[b]; if(!imgA) return;
-    const d=dims(imgA); if(!d.w) return;
+    const la=nearestLoaded(a); if(la<0) return;
+    const imgA=images[la], d=dims(imgA); if(!d.w) return;
     const cw=canvas.width, ch=canvas.height, ir=d.w/d.h, cr=cw/ch;
     let dw,dh,dx,dy;
     if(cr>ir){ dw=cw; dh=cw/ir; dx=0; dy=(ch-dh)/2; } else { dh=ch; dw=ch*ir; dy=0; dx=(cw-dw)/2; }
     ctx.globalAlpha=1; ctx.drawImage(imgA,dx,dy,dw,dh);
-    if(f>0.02 && imgB){ ctx.globalAlpha=f; ctx.drawImage(imgB,dx,dy,dw,dh); ctx.globalAlpha=1; }
+    if(f>0.02 && la===a && isReady(images[b])){ ctx.globalAlpha=f; ctx.drawImage(images[b],dx,dy,dw,dh); ctx.globalAlpha=1; }
   }
-  function resize(){ dpr=Math.min(window.devicePixelRatio||1,2);
-    canvas.width=Math.round(window.innerWidth*dpr); canvas.height=Math.round(window.innerHeight*dpr); drawBlend(playhead); }
+  function resize(){ dpr=Math.min(window.devicePixelRatio||1, isMobile()?1.5:2);
+    canvas.width=Math.round(window.innerWidth*dpr); canvas.height=Math.round(window.innerHeight*dpr);
+    ctx.imageSmoothingQuality='high'; drawBlend(playhead); }
 
   function applyText(){
     for(let k=0;k<N;k++){
@@ -408,26 +418,43 @@
       computeSecOpacity(m.sec, m.x);
       applyText(); updateCallouts(now); updateRail(m.sec,m.x);
       progTop.style.width=(p*100)+'%';
-      fcount.textContent='F '+String(Math.round(playhead)).padStart(4,'0')+' / 0900';
+      fcount.textContent='F '+String(Math.round(playhead)).padStart(3,'0')+' / 0300';
       sectorEl.textContent=beats[m.sec].getAttribute('data-sector');
       maybeSnap(now);
     }
     requestAnimationFrame(tick);
   }
 
+  const START_BUFFER = Math.min(30, TOTAL_FRAMES);  // frames needed before we begin
   function bump(){
     loaded++; const pct=Math.round(loaded/TOTAL_FRAMES*100);
     barFill.style.width=pct+'%'; loadPct.textContent='Loading experience '+pct+'%';
-    if(loaded>=TOTAL_FRAMES && !ready){ ready=true; resize();
+    // progressive start: play as soon as the opening is buffered, keep loading the rest
+    if(!ready && loaded>=START_BUFFER && isReady(images[1])){
+      ready=true; resize();
       scrollY=lenis?lenis.scroll:window.scrollY; const m=mapScroll(progress()); playhead=m.frame;
-      setTimeout(()=>loader.classList.add('hidden'),200); }
+      setTimeout(()=>loader.classList.add('hidden'),150);
+    }
   }
+  // browser-managed <img> (NOT pinned ImageBitmaps) — bounded decoded memory, mobile-safe
   function loadFrame(i){
-    return fetch(PATH(i)).then(r=>r.blob()).then(b=>createImageBitmap(b))
-      .then(bmp=>{ images[i]=bmp; if(i===1){resize();drawBlend(1);} bump(); })
-      .catch(()=>{ const img=new Image(); img.onload=()=>{images[i]=img; if(i===1){resize();drawBlend(1);} bump();}; img.onerror=bump; img.src=PATH(i); });
+    return new Promise(res=>{
+      const img=new Image(); img.decoding='async';
+      img.onload=()=>{ img.__loaded=true; if(i===1){resize();drawBlend(1);} bump(); res(); };
+      img.onerror=()=>{ bump(); res(); };
+      img.src=PATH(i);
+      images[i]=img;
+    });
   }
-  function preload(){ const C=isMobile()?6:12; let next=1; function pump(){ if(next>TOTAL_FRAMES) return; const i=next++; loadFrame(i).then(pump);} for(let k=0;k<C;k++) pump(); }
+  function preload(){
+    // load the section hold-frames first (each beat previews fast), then fill in order
+    const order=[], seen=new Set();
+    SECTIONS.forEach(s=>{ const f=Math.round(s.frame); if(!seen.has(f)){seen.add(f);order.push(f);} });
+    for(let i=1;i<=TOTAL_FRAMES;i++){ if(!seen.has(i)){seen.add(i);order.push(i);} }
+    const C=isMobile()?5:10; let idx=0;
+    function pump(){ if(idx>=order.length) return; const i=order[idx++]; loadFrame(i).then(pump); }
+    for(let k=0;k<C;k++) pump();
+  }
 
   let rt; window.addEventListener('resize', ()=>{ clearTimeout(rt); rt=setTimeout(()=>{ setSizer(); resize(); },120); }, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ setSizer(); resize(); },300); });

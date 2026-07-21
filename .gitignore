@@ -1,8 +1,14 @@
 # macOS
 .DS_Store
 
-# Large source assets not needed to run the site
-# (the site renders from frames/ — keep these out of git to stay lean).
-# Delete these lines if you want the source video + reference images in the repo.
+# Source assets not needed to run the deployed site.
+# The site renders from the optimized web/ folder (WebP frames).
 *.mp4
 Image References/
+
+# The heavy original 1080p JPG frame set (164MB) is NOT deployed —
+# the site uses web/ instead. Keep it out of the repo.
+frames/
+
+# temp check artifact
+web/_chk134.jpg
